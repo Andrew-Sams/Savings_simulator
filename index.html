@@ -1,249 +1,582 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Savings & Expense Monte Carlo Simulator</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-      :root {
-        --gap: 10px;
-      }
-      body {
-        font-family: Arial, sans-serif;
-        margin: var(--gap);
-      }
-      .controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--gap);
-      }
-      .controls label {
-        flex: 1 1 120px;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-top: var(--gap);
-      }
-      th,
-      td {
-        border: 1px solid #ccc;
-        padding: 4px;
-        text-align: left;
-      }
-      th {
-        background: #f0f0f0;
-      }
-      input,
-      select {
-        width: 100%;
-      }
-      button {
-        margin: 5px 0;
-        padding: 8px 12px;
-      }
-      .table-container {
-        overflow-x: auto;
-      }
-      canvas {
-        width: 100%;
-        height: 400px;
-      }
-      @media (max-width: 600px) {
-        body {
-          font-size: 14px;
-        }
-        button {
-          flex: 1 1 100%;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Savings & Expense Monte Carlo Simulator</h1>
-    <div class="controls">
-      <label>
-        Simulation Years:
-        <input type="number" id="years" value="30" min="1" />
-      </label>
-      <label>
-        Simulations:
-        <input type="number" id="sims" value="100" min="1" />
-      </label>
-      <button id="add-investment">Add Investment</button>
-      <button id="add-expense">Add Expense</button>
-      <button id="run">Run Simulation</button>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Net Worth Monte Carlo Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root{
+      --bg:#0f1226;--panel:#171a33;--ink:#eef2ff;--muted:#9aa4d6;--acc:#7c5cff;--acc2:#35d0ff;
+      --bad:#ff5c7a;--good:#45d19a;--ring: 0 0 0 2px color-mix(in oklab, var(--acc) 55%, transparent);
+      --gap:12px; --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;padding:24px;
+      font:500 16px/1.45 Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--ink); background:
+      radial-gradient(1000px 600px at 10% -10%, #1b1d3d 10%, transparent 60%),
+      radial-gradient(1200px 700px at 110% 0%, #0a1a26, transparent 60%),
+      linear-gradient(180deg, #0b0f1f, var(--bg));
+    }
+    h1{margin:0 0 16px;font-weight:800;letter-spacing:0.2px}
+    .sub{color:var(--muted);margin:2px 0 18px}
+    .wrap{display:grid;gap:16px;grid-template-columns:1fr}
+    .card{
+      background:color-mix(in oklab, var(--panel) 92%, #ffffff05 8%);
+      border:1px solid #2a2e56; border-radius:var(--radius); padding:16px; box-shadow:0 6px 30px #00000050;
+    }
+    .controls{display:grid;gap:12px;grid-template-columns: repeat(12, minmax(0,1fr)); align-items:end}
+    .controls .field{grid-column: span 3}
+    .controls .field.wide{grid-column: span 6}
+    .controls label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .controls input[type="number"], .controls input[type="text"], .controls select{
+      width:100%; padding:10px 12px; color:var(--ink); background:#12142b; border:1px solid #2a2e56;border-radius:10px; outline:none;
+    }
+    .controls input:focus, .controls select:focus{box-shadow:var(--ring);border-color:var(--acc)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px}
+    button{
+      background:linear-gradient(180deg, color-mix(in oklab, var(--acc) 70%, #fff 0%), var(--acc));
+      color:white; border:0; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700;
+      transition:transform .03s ease, filter .2s ease; box-shadow:0 6px 16px #0006;
+    }
+    button.secondary{background:#222643;color:#d7defc;border:1px solid #2a2e56}
+    button.ghost{background:transparent;border:1px dashed #38407a;color:var(--muted)}
+    button:active{transform:translateY(1px)}
+    .grid{overflow-x:auto}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    thead th{color:#c8cef6;font-size:12px;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:0 8px}
+    tbody tr{background:#12142b;border:1px solid #2a2e56}
+    tbody td{padding:8px}
+    tbody tr td:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px}
+    tbody tr td:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px}
+    td input, td select{
+      width:100%; padding:8px 10px; background:#0e1024; color:var(--ink); border:1px solid #2a2e56; border-radius:8px
+    }
+    td .chip{display:inline-block;padding:6px 10px;border-radius:999px;background:#0e1024;border:1px solid #2a2e56;color:#b7c1ff;font-size:12px}
+    .remove{background:#20122a;border-color:#3a2750}
+    .stats{display:grid;grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px}
+    .stat{background:#0f1329;border:1px solid #2a2e56;border-radius:12px;padding:12px}
+    .stat .k{color:#9aa4d6;font-size:12px}
+    .stat .v{font-weight:800;font-size:20px;margin-top:4px}
+    .bad{color:var(--bad)} .good{color:var(--good)}
+    canvas{width:100%!important; height:420px!important}
+    .note{color:#9aa4d6;font-size:12px}
+    @media (max-width:920px){
+      .controls .field{grid-column: span 6}
+      .controls .field.wide{grid-column: span 12}
+      .stats{grid-template-columns: repeat(2, minmax(0,1fr))}
+    }
+    @media (max-width:520px){
+      .controls .field{grid-column: span 12}
+      .toolbar{gap:6px}
+    }
+  </style>
+</head>
+<body>
+  <h1>Net Worth Monte Carlo</h1>
+  <div class="sub">Fan chart with median & percentile bands, inflation-adjusted option, presets, seed control, and import/export. Autosaves. 🚀</div>
+  <div class="wrap">
+    <div class="card">
+      <div class="controls">
+        <div class="field">
+          <label>Simulation years</label>
+          <input type="number" id="years" value="30" min="1" max="80">
+        </div>
+        <div class="field">
+          <label>Simulations</label>
+          <input type="number" id="sims" value="1000" min="50" max="10000" step="50">
+        </div>
+        <div class="field">
+          <label>Annual inflation %</label>
+          <input type="number" id="inflation" value="2.5" step="0.1">
+        </div>
+        <div class="field">
+          <label>Show results in today's dollars</label>
+          <select id="real">
+            <option value="yes" selected>Yes (deflate by inflation)</option>
+            <option value="no">No (nominal)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Currency</label>
+          <input type="text" id="currency" value="USD">
+        </div>
+        <div class="field">
+          <label>Seed (blank = random)</label>
+          <input type="text" id="seed" placeholder="e.g. 12345">
+        </div>
+        <div class="field wide">
+          <div class="toolbar">
+            <button id="add-investment">+ Investment</button>
+            <button id="add-expense" class="secondary">+ Expense</button>
+            <button id="run">Run</button>
+            <button id="reseed" class="secondary">Reseed</button>
+            <button id="preset" class="secondary">Load Preset</button>
+            <button id="export" class="ghost">Export JSON</button>
+            <button id="import" class="ghost">Import JSON</button>
+            <button id="reset" class="ghost">Reset</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="table-container">
+    <div class="card grid">
       <table id="bins-table">
         <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Initial</th>
-            <th>Min Return %</th>
-            <th>Max Return %</th>
-            <th>Contribution</th>
-            <th>Frequency</th>
-            <th></th>
-          </tr>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Initial</th>
+          <th>Return model</th>
+          <th>Mean %</th>
+          <th>Stdev %</th>
+          <th>Min %</th>
+          <th>Max %</th>
+          <th>Contribution</th>
+          <th>Frequency</th>
+          <th>Growth %/yr</th>
+          <th></th>
+        </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
 
-    <canvas id="chart"></canvas>
+    <div class="card">
+      <canvas id="chart"></canvas>
+      <div class="note">Shaded bands: 25–75% (darker) and 5–95% (lighter). Zoom/pan with mouse wheel / drag + ALT to reset (double-click).</div>
+    </div>
 
-    <script>
-      const binsBody = document.querySelector("#bins-table tbody");
-      const runButton = document.getElementById("run");
-      document
-        .getElementById("add-investment")
-        .addEventListener("click", () => addRow("investment"));
-      document
-        .getElementById("add-expense")
-        .addEventListener("click", () => addRow("expense"));
-      runButton.addEventListener("click", runSimulation);
+    <div class="stats" id="stats"></div>
+  </div>
 
-      function addRow(type) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><input type="text" value="${
-            type.charAt(0).toUpperCase() + type.slice(1)
-          } ${binsBody.children.length + 1}" /></td>
-          <td>${type}</td>
-          <td><input type="number" value="0" /></td>
-          <td><input type="number" value="0" ${
-            type === "investment" ? "" : "disabled"
-          } /></td>
-          <td><input type="number" value="0" ${
-            type === "investment" ? "" : "disabled"
-          } /></td>
-          <td><input type="number" value="0" /></td>
-          <td>
-            <select>
-              <option value="monthly">Monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="annual">Annual</option>
-            </select>
-          </td>
-          <td><button class="remove">X</button></td>
-        `;
-        tr.dataset.type = type;
-        tr.querySelector(".remove").onclick = () => {
-          tr.remove();
-          scheduleSimulation();
-        };
-        binsBody.appendChild(tr);
-      }
+<script>
+/* ========= Utilities ========= */
+const fmtCurrency = (v, cur) => {
+  try { return new Intl.NumberFormat(undefined, {style:'currency', currency: cur || 'USD', maximumFractionDigits:0}).format(v); }
+  catch { return new Intl.NumberFormat().format(v); }
+};
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const monthlyFromAnnual = a => Math.pow(1 + a, 1/12) - 1;
 
-      function readBins() {
-        return Array.from(binsBody.querySelectorAll("tr")).map((row) => {
-          const cells = row.querySelectorAll("td");
-          return {
-            name: cells[0].querySelector("input").value,
-            type: row.dataset.type,
-            initial: parseFloat(cells[2].querySelector("input").value) || 0,
-            minReturn: cells[3].querySelector("input")
-              ? parseFloat(cells[3].querySelector("input").value) / 100
-              : 0,
-            maxReturn: cells[4].querySelector("input")
-              ? parseFloat(cells[4].querySelector("input").value) / 100
-              : 0,
-            contribution: parseFloat(
-              cells[5].querySelector("input").value,
-            ) || 0,
-            frequency: cells[6].querySelector("select").value,
-          };
-        });
-      }
+/* Mulberry32 PRNG for reproducible seeds */
+function mulberry32(a) { return function() { let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function seededRand(seedStr) {
+  if (!seedStr) {
+    if (crypto?.getRandomValues) { const buf = new Uint32Array(1); crypto.getRandomValues(buf); return mulberry32(buf[0] || 1); }
+    return mulberry32(Math.floor(Math.random()*2**31));
+  }
+  let h=1779033703^seedStr.length, i=0;
+  for (; i<seedStr.length; i++) { h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return mulberry32(h>>>0);
+}
+/* Box-Muller */
+function randn(rand){ let u=0, v=0; while(u===0) u=rand(); while(v===0) v=rand(); return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v); }
 
-      function simulate(bins, years, sims) {
-        const timePoints = years * 12;
-        let binHistories = bins.map(() => Array(timePoints).fill(0));
-        let aggregateHistory = Array(timePoints).fill(0);
-        for (let s = 0; s < sims; s++) {
-          const amounts = bins.map((b) => b.initial);
-          let monthlyReturns = bins.map(() => 0);
-          for (let m = 0; m < timePoints; m++) {
-            if (m % 12 === 0) {
-              monthlyReturns = bins.map((b) => {
-                if (b.type === "investment") {
-                  const annual =
-                    Math.random() * (b.maxReturn - b.minReturn) + b.minReturn;
-                  return Math.pow(1 + annual, 1 / 12) - 1;
-                }
-                return 0;
-              });
-            }
-            let total = 0;
-            bins.forEach((b, i) => {
-              let contrib = 0;
-              if (b.frequency === "monthly") contrib = b.contribution;
-              else if (b.frequency === "weekly") contrib = b.contribution * 4;
-              else if (b.frequency === "annual" && m % 12 === 0)
-                contrib = b.contribution;
-              if (b.type === "expense") contrib = -Math.abs(contrib);
-              amounts[i] += contrib;
-              amounts[i] *= 1 + monthlyReturns[i];
-              binHistories[i][m] += amounts[i];
-              total += amounts[i];
-            });
-            aggregateHistory[m] += total;
+/* ========= DOM ========= */
+const tbody = document.querySelector("#bins-table tbody");
+const yearsEl = document.getElementById("years");
+const simsEl = document.getElementById("sims");
+const inflationEl = document.getElementById("inflation");
+const realEl = document.getElementById("real");
+const currencyEl = document.getElementById("currency");
+const seedEl = document.getElementById("seed");
+const statsEl = document.getElementById("stats");
+
+document.getElementById("add-investment").onclick = () => addRow('investment');
+document.getElementById("add-expense").onclick = () => addRow('expense');
+document.getElementById("reseed").onclick = () => { seedEl.value = String(Math.floor(Math.random()*1e9)); schedule(); };
+document.getElementById("run").onclick = run;
+document.getElementById("reset").onclick = () => { localStorage.removeItem('nwms_state'); location.reload(); };
+document.getElementById("preset").onclick = loadPreset;
+document.getElementById("export").onclick = doExport;
+document.getElementById("import").onclick = doImport;
+
+document.addEventListener("input", e => {
+  if (e.target.closest("#bins-table") || e.target.matches("#years,#sims,#inflation,#real,#currency,#seed")) {
+    saveState(); schedule();
+  }
+});
+
+/* ========= Rows ========= */
+function addRow(type, pre={}) {
+  const tr = document.createElement("tr");
+  tr.dataset.type = type;
+
+  tr.innerHTML = `
+    <td><input type="text" value="${pre.name??(type==='investment'?'Investment':'Expense')+' '+(tbody.children.length+1)}"></td>
+    <td><span class="chip">${type}</span></td>
+    <td><input type="number" step="100" value="${pre.initial??0}"></td>
+    <td>
+      <select ${type==='expense'?'disabled':''}>
+        <option value="normal" ${(pre.model??'normal')==='normal'?'selected':''}>Normal</option>
+        <option value="uniform" ${(pre.model??'normal')==='uniform'?'selected':''}>Uniform</option>
+      </select>
+    </td>
+    <td><input type="number" step="0.1" value="${pre.mean??(type==='investment'?7:0)}" ${type==='expense'?'disabled':''}></td>
+    <td><input type="number" step="0.1" value="${pre.stdev??(type==='investment'?15:0)}" ${type==='expense'?'disabled':''}></td>
+    <td><input type="number" step="0.1" value="${pre.min??0}" ${type==='expense'?'disabled':''}></td>
+    <td><input type="number" step="0.1" value="${pre.max??0}" ${type==='expense'?'disabled':''}></td>
+    <td><input type="number" step="10" value="${pre.contrib??0}"></td>
+    <td>
+      <select>
+        <option value="monthly" ${(pre.freq??'monthly')==='monthly'?'selected':''}>Monthly</option>
+        <option value="biweekly" ${(pre.freq??'monthly')==='biweekly'?'selected':''}>Biweekly</option>
+        <option value="weekly" ${(pre.freq??'monthly')==='weekly'?'selected':''}>Weekly</option>
+        <option value="quarterly" ${(pre.freq??'monthly')==='quarterly'?'selected':''}>Quarterly</option>
+        <option value="annual" ${(pre.freq??'monthly')==='annual'?'selected':''}>Annual</option>
+      </select>
+    </td>
+    <td><input type="number" step="0.1" value="${pre.growth??(type==='expense'?2.0:0)}"></td>
+    <td><button class="remove">✕</button></td>
+  `;
+  tr.querySelector(".remove").classList.add("secondary","remove");
+  tr.querySelector(".remove").onclick = () => { tr.remove(); saveState(); schedule(); };
+
+  tbody.appendChild(tr);
+}
+
+/* ========= IO ========= */
+function readBins(){
+  return Array.from(tbody.querySelectorAll("tr")).map(tr=>{
+    const tds = tr.querySelectorAll("td");
+    const get = (i,sel='input') => tds[i].querySelector(sel);
+    const modelSel = get(3,'select');
+    return {
+      name: get(0).value.trim() || (tr.dataset.type==='investment'?'Investment':'Expense'),
+      type: tr.dataset.type,
+      initial: +get(2).value || 0,
+      model: tr.dataset.type==='expense' ? 'none' : (modelSel?.value||'normal'),
+      mean: tr.dataset.type==='expense'?0:(+get(4).value||0)/100,
+      stdev: tr.dataset.type==='expense'?0:(+get(5).value||0)/100,
+      min: tr.dataset.type==='expense'?0:(+get(6).value||0)/100,
+      max: tr.dataset.type==='expense'?0:(+get(7).value||0)/100,
+      contrib: +get(8).value || 0,
+      freq: tds[9].querySelector('select').value,
+      growth: (+get(10).value||0)/100,
+    };
+  });
+}
+function saveState(){
+  const state = {
+    years:+yearsEl.value, sims:+simsEl.value, inflation:+inflationEl.value, real:realEl.value,
+    currency:currencyEl.value, seed:seedEl.value, bins:readBins()
+  };
+  localStorage.setItem('nwms_state', JSON.stringify(state));
+}
+function loadState(){
+  const s = localStorage.getItem('nwms_state');
+  if(!s){ // First time: add some tasty defaults
+    addRow('investment', {name:'Index Fund', initial:50000, model:'normal', mean:7, stdev:15, contrib:1500, freq:'monthly', growth:0});
+    addRow('investment', {name:'Cash', initial:20000, model:'normal', mean:2, stdev:1, contrib:0});
+    addRow('expense', {name:'Living', initial:0, contrib:3000, freq:'monthly', growth:2.5});
+    schedule(); return;
+  }
+  try {
+    const state = JSON.parse(s);
+    yearsEl.value = state.years ?? 30;
+    simsEl.value = state.sims ?? 1000;
+    inflationEl.value = state.inflation ?? 2.5;
+    realEl.value = state.real ?? 'yes';
+    currencyEl.value = state.currency ?? 'USD';
+    seedEl.value = state.seed ?? '';
+    tbody.innerHTML='';
+    (state.bins||[]).forEach(b=>addRow(b.type,b));
+  } catch(e){ console.warn('Bad saved state', e); }
+  schedule();
+}
+
+/* ========= Presets ========= */
+function loadPreset(){
+  const choice = prompt(
+`Preset options:
+1) Balanced FIRE (stocks + cash + living)
+2) Aggressive Growth
+3) Coast FIRE (high savings, low spend)
+4) Debt Paydown + Invest
+
+Enter number:`, "1");
+  const cur = currencyEl.value || 'USD';
+  if(!choice) return;
+  tbody.innerHTML='';
+  switch(String(choice).trim()){
+    case '2':
+      addRow('investment', {name:'Global Stocks', initial:25000, model:'normal', mean:8.5, stdev:20, contrib:2500, freq:'monthly'});
+      addRow('investment', {name:'Bonds', initial:5000, model:'normal', mean:3.5, stdev:6, contrib:300, freq:'monthly'});
+      addRow('expense', {name:'Living', contrib:2800, freq:'monthly', growth:2.2});
+      break;
+    case '3':
+      addRow('investment', {name:'Index Fund', initial:120000, model:'normal', mean:7, stdev:15, contrib:800, freq:'monthly'});
+      addRow('investment', {name:'Cash', initial:20000, model:'normal', mean:2, stdev:1});
+      addRow('expense', {name:'Lean Living', contrib:2000, freq:'monthly', growth:2.0});
+      break;
+    case '4':
+      addRow('investment', {name:'Index Fund', initial:10000, model:'normal', mean:7, stdev:15, contrib:600, freq:'monthly'});
+      addRow('expense', {name:'Living', contrib:2500, freq:'monthly', growth:2.2});
+      addRow('expense', {name:'Debt Payment', contrib:600, freq:'monthly', growth:0});
+      break;
+    default:
+      addRow('investment', {name:'Index Fund', initial:50000, model:'normal', mean:7, stdev:15, contrib:1500, freq:'monthly'});
+      addRow('investment', {name:'Cash', initial:20000, model:'normal', mean:2, stdev:1});
+      addRow('expense', {name:'Living', contrib:3000, freq:'monthly', growth:2.5});
+  }
+  saveState(); schedule();
+}
+function doExport(){
+  const blob = new Blob([JSON.stringify({
+    years:+yearsEl.value, sims:+simsEl.value, inflation:+inflationEl.value, real:realEl.value,
+    currency:currencyEl.value, seed:seedEl.value, bins:readBins()
+  }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'net_worth_sim.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function doImport(){
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='application/json';
+  inp.onchange = ()=> {
+    const file = inp.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const state = JSON.parse(reader.result);
+        yearsEl.value = state.years ?? 30;
+        simsEl.value = state.sims ?? 1000;
+        inflationEl.value = state.inflation ?? 2.5;
+        realEl.value = state.real ?? 'yes';
+        currencyEl.value = state.currency ?? 'USD';
+        seedEl.value = state.seed ?? '';
+        tbody.innerHTML='';
+        (state.bins||[]).forEach(b=>addRow(b.type,b));
+        saveState(); schedule();
+      }catch(e){ alert('Invalid JSON'); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
+/* ========= Simulation ========= */
+function run(){
+  const years = clamp(parseInt(yearsEl.value)||30, 1, 120);
+  const sims = clamp(parseInt(simsEl.value)||1000, 50, 10000);
+  const bins = readBins();
+  if (bins.length===0){ alert('Add at least one row'); return; }
+  const inflA = (+inflationEl.value||0)/100;
+  const real = realEl.value==='yes';
+  const currency = currencyEl.value || 'USD';
+  const rand = seededRand(seedEl.value||'');
+
+  const months = years*12;
+  const freqToMonthly = (b) => {
+    if (b.freq==='monthly') return 1;
+    if (b.freq==='weekly') return 52/12;
+    if (b.freq==='biweekly') return 26/12;
+    if (b.freq==='quarterly') return 0.25;
+    if (b.freq==='annual') return 1/12;
+    return 1;
+  };
+
+  // Precompute monthly inflation and growth factors
+  const inflM = monthlyFromAnnual(inflA);
+  const growthM = bins.map(b => monthlyFromAnnual(b.growth));
+
+  // Sim paths (aggregate only to keep it fast); also track drawdown below 0
+  const paths = Array.from({length:sims}, ()=> new Float64Array(months));
+  let brokeCount = 0;
+
+  // For performance, prepare arrays outside loops
+  const initAmounts = bins.map(b => b.initial || 0);
+  const contribNow = bins.map(b => b.contrib || 0);
+  const monthlyRateCache = new Array(bins.length).fill(0); // for uniform annual per-year
+
+  for (let s=0; s<sims; s++){
+    const amounts = initAmounts.slice();             // current balances per bin
+    const contribs = contribNow.slice();             // current recurring contrib per bin (will grow)
+    let everBroke = false;
+
+    // reset per-year uniform rates
+    for (let i=0;i<bins.length;i++){
+      if (bins[i].type==='investment' && bins[i].model==='uniform'){
+        const rA = bins[i].min + rand()*(bins[i].max - bins[i].min);
+        monthlyRateCache[i] = monthlyFromAnnual(rA);
+      } else monthlyRateCache[i] = 0;
+    }
+
+    for (let m=0; m<months; m++){
+      // refresh uniform annual once per year
+      if (m%12===0 && m>0){
+        for (let i=0;i<bins.length;i++){
+          if (bins[i].type==='investment' && bins[i].model==='uniform'){
+            const rA = bins[i].min + rand()*(bins[i].max - bins[i].min);
+            monthlyRateCache[i] = monthlyFromAnnual(rA);
           }
         }
-        return {
-          binHistories: binHistories.map((hist) => hist.map((v) => v / sims)),
-          aggregateHistory: aggregateHistory.map((v) => v / sims),
-          labels: Array.from({ length: timePoints }, (_, i) => `Month ${i + 1}`),
-        };
       }
+      let total = 0;
 
-      function renderChart({ binHistories, aggregateHistory, labels }, bins) {
-          const ctx = document.getElementById("chart").getContext("2d");
-          if (window.chart) window.chart.destroy();
-          window.chart = new Chart(ctx, {
-            type: "line",
-            data: {
-              labels,
-              datasets: [
-                ...binHistories.map((hist, i) => ({
-                  label: bins[i].name,
-                  data: hist,
-                })),
-                { label: "Aggregate", data: aggregateHistory, borderWidth: 2 },
-              ],
-            },
-            options: { scales: { y: { beginAtZero: true } } },
-          });
-      }
+      for (let i=0;i<bins.length;i++){
+        const b = bins[i];
 
-      function runSimulation() {
-        const years = parseInt(document.getElementById("years").value);
-        const sims = parseInt(document.getElementById("sims").value);
-        const bins = readBins();
-        const result = simulate(bins, years, sims);
-        renderChart(result, bins);
-      }
+        // 1) Apply cash flows at start of month
+        let add = 0;
+        if (b.freq==='monthly') add = contribs[i];
+        else if (b.freq==='weekly') add = contribs[i]*52/12;
+        else if (b.freq==='biweekly') add = contribs[i]*26/12;
+        else if (b.freq==='quarterly') add = (m%3===0) ? contribs[i] : 0;
+        else if (b.freq==='annual') add = (m%12===0) ? contribs[i] : 0;
 
-      let timeout;
-      function scheduleSimulation() {
-        clearTimeout(timeout);
-        timeout = setTimeout(runSimulation, 300);
-      }
+        if (b.type==='expense') add = -Math.abs(add);
+        amounts[i] += add;
 
-      document.addEventListener("input", (e) => {
-        if (e.target.closest("table") || e.target.id === "years" || e.target.id === "sims") {
-          scheduleSimulation();
+        // 2) Investment return
+        if (b.type==='investment'){
+          let rM = 0;
+          if (b.model==='normal'){
+            const muA = b.mean, sdA = Math.max(0, b.stdev);
+            const muM = muA/12, sdM = sdA/Math.sqrt(12);
+            rM = muM + sdM * randn(rand);
+            rM = Math.max(-0.95, rM); // prevent >-100% wipe
+          } else if (b.model==='uniform'){
+            rM = monthlyRateCache[i];
+          }
+          amounts[i] *= (1 + rM);
         }
-      });
 
-      // Add one default investment and expense row
-      addRow("investment");
-      addRow("expense");
-      runSimulation();
-    </script>
-  </body>
+        // 3) Grow contribution for next iteration (monthly comp of annual growth)
+        contribs[i] *= (1 + growthM[i]);
+
+        total += amounts[i];
+      }
+
+      // 4) Deflate to real terms if requested
+      const monthsElapsed = m+1;
+      let shown = total;
+      if (real){
+        const deflator = Math.pow(1+inflM, monthsElapsed); // monthly comp
+        shown = total / deflator;
+      }
+
+      paths[s][m] = shown;
+      if (!everBroke && shown < 0) everBroke = true;
+    }
+    if (everBroke) brokeCount++;
+  }
+
+  // Quantiles per month
+  const qs = (arr, ps)=> {
+    arr.sort((a,b)=>a-b);
+    const n = arr.length-1;
+    return ps.map(p=>{
+      const pos = n*p, lo = Math.floor(pos), hi = Math.ceil(pos);
+      if (hi===lo) return arr[lo];
+      const t = pos - lo;
+      return arr[lo] + (arr[hi]-arr[lo])*t;
+    });
+  };
+  const P = {p05:[], p25:[], p50:[], p75:[], p95:[], mean:[]};
+  for (let m=0;m<months;m++){
+    const col = new Float64Array(sims);
+    let sum=0;
+    for (let s=0;s<sims;s++){ const v = paths[s][m]; col[s]=v; sum+=v; }
+    const [q05,q25,q50,q75,q95] = qs(Array.from(col), [0.05,0.25,0.5,0.75,0.95]);
+    P.p05[m]=q05; P.p25[m]=q25; P.p50[m]=q50; P.p75[m]=q75; P.p95[m]=q95; P.mean[m]=sum/sims;
+  }
+  const last = months-1;
+  const finals = Array.from({length:sims}, (_,i)=>paths[i][last]).sort((a,b)=>a-b);
+  const fin = {
+    min: finals[0], p05: finals[Math.floor(0.05*(sims-1))], p25: finals[Math.floor(0.25*(sims-1))],
+    p50: finals[Math.floor(0.50*(sims-1))], p75: finals[Math.floor(0.75*(sims-1))],
+    p95: finals[Math.floor(0.95*(sims-1))], max: finals[finals.length-1],
+    mean: finals.reduce((a,b)=>a+b,0)/sims
+  };
+  const brokeProb = brokeCount/sims;
+
+  renderChart(P, months);
+  renderStats(fin, brokeProb, currency);
+  saveState();
+}
+
+/* ========= Chart ========= */
+let chart;
+function renderChart(P, months){
+  const labels = Array.from({length:months}, (_,i)=> {
+    const y = Math.floor(i/12);
+    const m = (i%12)+1;
+    return `Y${y} M${m}`;
+  });
+
+  const ctx = document.getElementById('chart').getContext('2d');
+  if (chart) chart.destroy();
+
+  // bands are drawn as "upper then lower (fill to previous)"
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'95th', data:P.p95, borderColor:'rgba(124,92,255,0.0)', pointRadius:0, fill:false},
+        {label:'5–95% band', data:P.p05, borderColor:'rgba(124,92,255,0)', backgroundColor:'rgba(53,208,255,0.18)', fill:1, pointRadius:0},
+
+        {label:'75th', data:P.p75, borderColor:'rgba(124,92,255,0)', pointRadius:0, fill:false},
+        {label:'25–75% band', data:P.p25, borderColor:'rgba(124,92,255,0)', backgroundColor:'rgba(124,92,255,0.25)', fill:3, pointRadius:0},
+
+        {label:'Median', data:P.p50, borderColor:'#7c5cff', pointRadius:0, borderWidth:2},
+        {label:'Mean', data:P.mean, borderColor:'#35d0ff', borderDash:[6,4], pointRadius:0, borderWidth:2}
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index', intersect:false},
+      maintainAspectRatio:false,
+      scales:{
+        x:{ticks:{maxTicksLimit:Math.min(24, months)}, grid:{color:'rgba(255,255,255,0.06)'}},
+        y:{grid:{color:'rgba(255,255,255,0.08)'}, ticks:{callback:(v)=>Intl.NumberFormat().format(v)}}
+      },
+      plugins:{
+        legend:{labels:{color:'#dbe0ff'}},
+        tooltip:{
+          callbacks:{
+            label: (ctx)=> `${ctx.dataset.label}: ${Intl.NumberFormat().format(ctx.parsed.y)}`
+          }
+        }
+      }
+    }
+  });
+
+  // Double click to reset zoom-like view (we don't load zoom plugin to keep it lean)
+  ctx.canvas.addEventListener('dblclick', ()=> chart.reset());
+}
+
+/* ========= Stats ========= */
+function renderStats(fin, brokeProb, currency){
+  const items = [
+    {k:"Median final", v: fmtCurrency(fin.p50, currency), cls:""},
+    {k:"Mean final", v: fmtCurrency(fin.mean, currency), cls:""},
+    {k:"5th–95th", v: `${fmtCurrency(fin.p05, currency)} → ${fmtCurrency(fin.p95, currency)}`, cls:""},
+    {k:"Prob. ever below $0", v: (brokeProb*100).toFixed(1)+"%", cls: brokeProb>0.2?'bad':'good'},
+    {k:"Best / Worst", v: `${fmtCurrency(fin.max, currency)} / ${fmtCurrency(fin.min, currency)}`, cls:""},
+    {k:"25th / 75th", v: `${fmtCurrency(fin.p25, currency)} / ${fmtCurrency(fin.p75, currency)}`, cls:""},
+  ];
+  statsEl.innerHTML = items.map(i=>`
+    <div class="stat">
+      <div class="k">${i.k}</div>
+      <div class="v ${i.cls||''}">${i.v}</div>
+    </div>
+  `).join('');
+}
+
+/* ========= Auto-run with debounce ========= */
+let tmr;
+function schedule(){ clearTimeout(tmr); tmr = setTimeout(run, 120); }
+
+/* ========= Init ========= */
+loadState();
+</script>
+</body>
 </html>
