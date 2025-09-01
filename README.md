@@ -8,8 +8,12 @@ Access the simulator online at [https://andrew-sams.github.io/Savings_simulator/
 
 ## Usage
 
-1. Open `Index.html` locally or via the [GitHub Pages site](https://andrew-sams.github.io/Savings_simulator/).
+1. Open `index.html` locally or via the [GitHub Pages site](https://andrew-sams.github.io/Savings_simulator/).
 2. Add investment or expense categories and fill in their initial amounts, return ranges, and contribution schedules.
 3. Set the number of years and simulations, then press **Run Simulation** to view average growth for each category and the overall net worth over time.
 
 To host with GitHub Pages, enable Pages for the `main` branch in the repository settings.
+
+### Mobile friendly
+
+The simulator now automatically updates as you tweak any field and is designed to work on phones and tablets. The controls wrap on small screens and the table scrolls horizontally when space is tight.
