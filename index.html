@@ -2,17 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Savings & Expense Monte Carlo Simulator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+      :root {
+        --gap: 10px;
+      }
       body {
         font-family: Arial, sans-serif;
-        margin: 20px;
+        margin: var(--gap);
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap);
+      }
+      .controls label {
+        flex: 1 1 120px;
       }
       table {
         border-collapse: collapse;
         width: 100%;
-        margin-top: 10px;
+        margin-top: var(--gap);
       }
       th,
       td {
@@ -29,76 +41,106 @@
       }
       button {
         margin: 5px 0;
+        padding: 8px 12px;
+      }
+      .table-container {
+        overflow-x: auto;
+      }
+      canvas {
+        width: 100%;
+        height: 400px;
+      }
+      @media (max-width: 600px) {
+        body {
+          font-size: 14px;
+        }
+        button {
+          flex: 1 1 100%;
+        }
       }
     </style>
   </head>
   <body>
     <h1>Savings & Expense Monte Carlo Simulator</h1>
-    <div>
-      <label
-        >Simulation Years: <input type="number" id="years" value="30"
-      /></label>
-      <label>Simulations: <input type="number" id="sims" value="100" /></label>
+    <div class="controls">
+      <label>
+        Simulation Years:
+        <input type="number" id="years" value="30" min="1" />
+      </label>
+      <label>
+        Simulations:
+        <input type="number" id="sims" value="100" min="1" />
+      </label>
       <button id="add-investment">Add Investment</button>
       <button id="add-expense">Add Expense</button>
       <button id="run">Run Simulation</button>
     </div>
 
-    <table id="bins-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Initial</th>
-          <th>Min Return %</th>
-          <th>Max Return %</th>
-          <th>Contribution</th>
-          <th>Frequency</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-container">
+      <table id="bins-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Initial</th>
+            <th>Min Return %</th>
+            <th>Max Return %</th>
+            <th>Contribution</th>
+            <th>Frequency</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-    <canvas id="chart" width="800" height="400"></canvas>
+    <canvas id="chart"></canvas>
 
     <script>
       const binsBody = document.querySelector("#bins-table tbody");
-      document.getElementById("add-investment").onclick = () =>
-        addRow("investment");
-      document.getElementById("add-expense").onclick = () => addRow("expense");
-      document.getElementById("run").onclick = runSimulation;
+      const runButton = document.getElementById("run");
+      document
+        .getElementById("add-investment")
+        .addEventListener("click", () => addRow("investment"));
+      document
+        .getElementById("add-expense")
+        .addEventListener("click", () => addRow("expense"));
+      runButton.addEventListener("click", runSimulation);
 
       function addRow(type) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-        <td><input type="text" value="${type.charAt(0).toUpperCase() + type.slice(1)} ${binsBody.children.length + 1}" /></td>
-        <td>${type}</td>
-        <td><input type="number" value="0" /></td>
-        <td><input type="number" value="0" ${type === "investment" ? "" : "disabled"} /></td>
-        <td><input type="number" value="0" ${type === "investment" ? "" : "disabled"} /></td>
-        <td><input type="number" value="0" /></td>
-        <td>
-          <select>
-            <option value="monthly">Monthly</option>
-            <option value="weekly">Weekly</option>
-            <option value="annual">Annual</option>
-          </select>
-        </td>
-        <td><button class="remove">X</button></td>
-      `;
+          <td><input type="text" value="${
+            type.charAt(0).toUpperCase() + type.slice(1)
+          } ${binsBody.children.length + 1}" /></td>
+          <td>${type}</td>
+          <td><input type="number" value="0" /></td>
+          <td><input type="number" value="0" ${
+            type === "investment" ? "" : "disabled"
+          } /></td>
+          <td><input type="number" value="0" ${
+            type === "investment" ? "" : "disabled"
+          } /></td>
+          <td><input type="number" value="0" /></td>
+          <td>
+            <select>
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="annual">Annual</option>
+            </select>
+          </td>
+          <td><button class="remove">X</button></td>
+        `;
         tr.dataset.type = type;
-        tr.querySelector(".remove").onclick = () => tr.remove();
+        tr.querySelector(".remove").onclick = () => {
+          tr.remove();
+          scheduleSimulation();
+        };
         binsBody.appendChild(tr);
       }
 
-      function runSimulation() {
-        const years = parseInt(document.getElementById("years").value);
-        const sims = parseInt(document.getElementById("sims").value);
-        const timePoints = years * 12;
-
-        const rows = Array.from(binsBody.querySelectorAll("tr"));
-        const bins = rows.map((row) => {
+      function readBins() {
+        return Array.from(binsBody.querySelectorAll("tr")).map((row) => {
           const cells = row.querySelectorAll("td");
           return {
             name: cells[0].querySelector("input").value,
@@ -110,15 +152,18 @@
             maxReturn: cells[4].querySelector("input")
               ? parseFloat(cells[4].querySelector("input").value) / 100
               : 0,
-            contribution:
-              parseFloat(cells[5].querySelector("input").value) || 0,
+            contribution: parseFloat(
+              cells[5].querySelector("input").value,
+            ) || 0,
             frequency: cells[6].querySelector("select").value,
           };
         });
+      }
 
+      function simulate(bins, years, sims) {
+        const timePoints = years * 12;
         let binHistories = bins.map(() => Array(timePoints).fill(0));
         let aggregateHistory = Array(timePoints).fill(0);
-
         for (let s = 0; s < sims; s++) {
           const amounts = bins.map((b) => b.initial);
           let monthlyReturns = bins.map(() => 0);
@@ -140,48 +185,65 @@
               else if (b.frequency === "weekly") contrib = b.contribution * 4;
               else if (b.frequency === "annual" && m % 12 === 0)
                 contrib = b.contribution;
-
               if (b.type === "expense") contrib = -Math.abs(contrib);
-
               amounts[i] += contrib;
               amounts[i] *= 1 + monthlyReturns[i];
-
               binHistories[i][m] += amounts[i];
               total += amounts[i];
             });
             aggregateHistory[m] += total;
           }
         }
-
-        binHistories = binHistories.map((hist) => hist.map((v) => v / sims));
-        aggregateHistory = aggregateHistory.map((v) => v / sims);
-
-        const ctx = document.getElementById("chart").getContext("2d");
-        if (window.chart) window.chart.destroy();
-        window.chart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: Array.from(
-              { length: timePoints },
-              (_, i) => `Month ${i + 1}`,
-            ),
-            datasets: [
-              ...binHistories.map((hist, i) => ({
-                label: bins[i].name,
-                data: hist,
-              })),
-              { label: "Aggregate", data: aggregateHistory, borderWidth: 2 },
-            ],
-          },
-          options: {
-            scales: { y: { beginAtZero: true } },
-          },
-        });
+        return {
+          binHistories: binHistories.map((hist) => hist.map((v) => v / sims)),
+          aggregateHistory: aggregateHistory.map((v) => v / sims),
+          labels: Array.from({ length: timePoints }, (_, i) => `Month ${i + 1}`),
+        };
       }
+
+      function renderChart({ binHistories, aggregateHistory, labels }, bins) {
+          const ctx = document.getElementById("chart").getContext("2d");
+          if (window.chart) window.chart.destroy();
+          window.chart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                ...binHistories.map((hist, i) => ({
+                  label: bins[i].name,
+                  data: hist,
+                })),
+                { label: "Aggregate", data: aggregateHistory, borderWidth: 2 },
+              ],
+            },
+            options: { scales: { y: { beginAtZero: true } } },
+          });
+      }
+
+      function runSimulation() {
+        const years = parseInt(document.getElementById("years").value);
+        const sims = parseInt(document.getElementById("sims").value);
+        const bins = readBins();
+        const result = simulate(bins, years, sims);
+        renderChart(result, bins);
+      }
+
+      let timeout;
+      function scheduleSimulation() {
+        clearTimeout(timeout);
+        timeout = setTimeout(runSimulation, 300);
+      }
+
+      document.addEventListener("input", (e) => {
+        if (e.target.closest("table") || e.target.id === "years" || e.target.id === "sims") {
+          scheduleSimulation();
+        }
+      });
 
       // Add one default investment and expense row
       addRow("investment");
       addRow("expense");
+      runSimulation();
     </script>
   </body>
 </html>
